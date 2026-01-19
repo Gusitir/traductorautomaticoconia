@@ -756,7 +756,7 @@
 </head>
 
 <body>
-  <div class="version">v2.00 - Local</div>
+  <div class="version">v2.01 - Local</div>
   
   <div class="wrap">
     <div class="top">
@@ -956,8 +956,7 @@
         const res = await fetch(getApiUrl("/api/chat"), {
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
-            "ngrok-skip-browser-warning": "true"
+            "Content-Type": "application/json"
           },
           body: JSON.stringify({
             model: "qwen3:8b",
@@ -1124,8 +1123,7 @@
         const response = await fetch(getApiUrl("/api/chat"), {
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
-            "ngrok-skip-browser-warning": "true"
+            "Content-Type": "application/json"
           },
           body: JSON.stringify({
             model: "qwen3:8b",
