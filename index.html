@@ -675,15 +675,7 @@
       </div>
 
       <div class="chat-messages" id="chatMessages">
-        <div class="chat-message">
-          <div class="message-avatar">🤖</div>
-          <div>
-            <div class="message-bubble">
-              ¡Hola! 👋 Soy tu asistente virtual. ¿En qué puedo ayudarte hoy?
-            </div>
-            <div class="message-time">Ahora</div>
-          </div>
-        </div>
+        <!-- Los mensajes se agregan dinámicamente -->
       </div>
 
       <div class="chat-input-area">
@@ -799,10 +791,61 @@
     const chatInput = $("chatInput");
     const chatSend = $("chatSend");
 
+    // Función para obtener hora actual
+    function getCurrentTime(){
+      const now = new Date();
+      return now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    // Función para agregar mensaje al chat
+    function addMessage(text, isUser = false){
+      const messageDiv = document.createElement("div");
+      messageDiv.className = "chat-message" + (isUser ? " user" : "");
+      
+      const avatar = document.createElement("div");
+      avatar.className = "message-avatar";
+      avatar.textContent = isUser ? "👤" : "🤖";
+      
+      const contentDiv = document.createElement("div");
+      
+      const bubble = document.createElement("div");
+      bubble.className = "message-bubble";
+      bubble.textContent = text;
+      
+      const time = document.createElement("div");
+      time.className = "message-time";
+      time.textContent = getCurrentTime();
+      
+      contentDiv.appendChild(bubble);
+      contentDiv.appendChild(time);
+      messageDiv.appendChild(avatar);
+      messageDiv.appendChild(contentDiv);
+      
+      chatMessages.appendChild(messageDiv);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    // Mensaje de bienvenida al abrir el chat por primera vez
+    let chatOpened = false;
+    
     function toggleChat(){
       chatWindow.classList.toggle("open");
       if(chatWindow.classList.contains("open")){
         chatInput.focus();
+        
+        // Mostrar mensaje de bienvenida solo la primera vez
+        if(!chatOpened){
+          chatOpened = true;
+          setTimeout(() => {
+            addMessage("¡Hola! 👋 Bienvenido al Traductor n8n + IA");
+          }, 300);
+          setTimeout(() => {
+            addMessage("Soy tu asistente virtual. ¿En qué puedo ayudarte hoy?");
+          }, 900);
+          setTimeout(() => {
+            addMessage("Puedo responder preguntas sobre cómo usar el traductor, los idiomas disponibles, o cualquier duda que tengas. 😊");
+          }, 1500);
+        }
       }
     }
 
