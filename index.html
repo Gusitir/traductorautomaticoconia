@@ -649,7 +649,7 @@
 
       <div class="status">
         <div id="statusLeft"></div>
-        <div id="statusRight">Fuente: n8n Webhook + OpenAI</div>
+        <div id="statusRight">Fuente: Ollama (llama3.2)</div>
       </div>
     </div>
   </div>
@@ -692,7 +692,7 @@
   </div>
 
   <script>
-    const WEBHOOK_URL = "https://sihat.app.n8n.cloud/webhook/translate";
+    const OLLAMA_URL = "https://four-days-play.loca.lt";
 
     const $ = (id) => document.getElementById(id);
     const btn = $("btn");
@@ -714,8 +714,6 @@
       btnIcon.innerHTML = isLoading ? "<span class='spinner'></span>" : "🪄";
       btnText.textContent = isLoading ? "Traduciendo..." : "Traducir";
     }
-
-    function safeText(s){ return (s ?? "").toString(); }
 
     $("text").addEventListener("input", () => {
       charCount.textContent = `${$("text").value.length} caracteres`;
@@ -757,26 +755,56 @@
       }
 
       setLoading(true);
-      statusLeft.textContent = "Conectando al webhook...";
+      statusLeft.textContent = "Traduciendo con IA...";
 
       try{
-        const url = WEBHOOK_URL
-          + "?text=" + encodeURIComponent(text)
-          + "&target=" + encodeURIComponent(target);
+        // Mapa de códigos de idioma a nombres completos
+        const languages = {
+          'es': 'español',
+          'en': 'inglés',
+          'fr': 'francés',
+          'pt': 'portugués',
+          'de': 'alemán',
+          'it': 'italiano'
+        };
 
-        const res = await fetch(url, { method: "GET" });
-        const data = await res.json().catch(()=> ({}));
+        const targetLang = languages[target] || target;
 
-        if (!res.ok || data.success === false){
-          const msg = data.error || res.statusText || "Error desconocido";
-          out.innerHTML = "<span class='error'>"+ safeText(msg) +"</span>";
+        // Llamada a Ollama para traducción
+        const res = await fetch(`${OLLAMA_URL}/api/chat`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "llama3.2",
+            messages: [
+              {
+                role: "system",
+                content: `Eres un traductor profesional. Tu única tarea es traducir el texto que te proporcionen al idioma ${targetLang}. Responde ÚNICAMENTE con la traducción, sin explicaciones, sin comentarios adicionales, solo el texto traducido.`
+              },
+              {
+                role: "user",
+                content: text
+              }
+            ],
+            stream: false
+          })
+        });
+
+        if (!res.ok){
+          const errorText = await res.text().catch(() => "");
+          out.innerHTML = "<span class='error'>Error en el servidor: " + (res.statusText || "Error desconocido") + "</span>";
           statusLeft.innerHTML = "<span class='error'>Error.</span>";
         } else {
-          out.textContent = safeText(data.translation) || "(sin traducción)";
-          statusLeft.innerHTML = "<span class='ok'></span> Traducido a <b>"+ safeText(data.target || target) +"</b>";
+          const data = await res.json();
+          const translation = data.message?.content || "(sin traducción)";
+          out.textContent = translation;
+          statusLeft.innerHTML = "<span class='ok'>✓</span> Traducido a <b>"+ targetLang +"</b>";
         }
       }catch(e){
-        out.innerHTML = "<span class='error'>No se pudo conectar al webhook. Revisa que el workflow esté activo y la URL sea de producción.</span>";
+        console.error("Error de traducción:", e);
+        out.innerHTML = "<span class='error'>No se pudo conectar al servidor de Ollama. Verifica que el servicio esté activo.</span>";
         statusLeft.innerHTML = "<span class='error'>Sin conexión.</span>";
       }finally{
         setLoading(false);
@@ -866,15 +894,76 @@
       }
     });
 
-    // Función para enviar mensaje (aquí agregarás la lógica después)
-    chatSend.addEventListener("click", function(){
+    // Función para enviar mensaje a Ollama
+    chatSend.addEventListener("click", async function(){
       const message = chatInput.value.trim();
       if(!message) return;
 
-      // Aquí agregarás la funcionalidad después
-      console.log("Mensaje:", message);
+      // Mostrar mensaje del usuario
+      addMessage(message, true);
       chatInput.value = "";
       chatInput.style.height = "auto";
+
+      // Deshabilitar botón mientras se procesa
+      chatSend.disabled = true;
+
+      // Mostrar indicador de escritura
+      const typingDiv = document.createElement("div");
+      typingDiv.className = "chat-message";
+      typingDiv.id = "typing-indicator";
+      typingDiv.innerHTML = `
+        <div class="message-avatar">🤖</div>
+        <div>
+          <div class="message-bubble">
+            <span class="spinner"></span> Escribiendo...
+          </div>
+        </div>
+      `;
+      chatMessages.appendChild(typingDiv);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+
+      try {
+        // Llamada a Ollama
+        const response = await fetch(`${OLLAMA_URL}/api/chat`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "llama3.2",
+            messages: [
+              {
+                role: "system",
+                content: "Eres un asistente útil del Traductor n8n + IA. Ayudas a los usuarios con preguntas sobre cómo usar el traductor, los idiomas disponibles, y cualquier duda relacionada con la aplicación. Responde de manera amigable y concisa."
+              },
+              {
+                role: "user",
+                content: message
+              }
+            ],
+            stream: false
+          })
+        });
+
+        // Remover indicador de escritura
+        const typing = document.getElementById("typing-indicator");
+        if(typing) typing.remove();
+
+        if(response.ok){
+          const data = await response.json();
+          const aiResponse = data.message?.content || "Lo siento, no pude generar una respuesta.";
+          addMessage(aiResponse);
+        } else {
+          addMessage("Lo siento, hubo un error al conectar con el servidor. Por favor intenta nuevamente.");
+        }
+      } catch(error) {
+        console.error("Error:", error);
+        const typing = document.getElementById("typing-indicator");
+        if(typing) typing.remove();
+        addMessage("No pude conectarme al servidor. Verifica que el servicio de Ollama esté activo.");
+      } finally {
+        chatSend.disabled = false;
+      }
     });
   </script>
 </body>
